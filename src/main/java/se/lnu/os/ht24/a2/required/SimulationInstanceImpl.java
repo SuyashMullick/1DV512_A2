@@ -16,6 +16,8 @@ public class SimulationInstanceImpl implements SimulationInstance {
   private Queue<Instruction> remainingInstructions;
   private final MemoryImpl memory;
   private final StrategyType strategyType;
+
+  // The list of exceptions that occuerd during the execution of instructions.
   private final List<InstructionException> instructionExceptions;
 
   public SimulationInstanceImpl(Queue<Instruction> instructions, MemoryImpl memory, StrategyType strategyType) {
@@ -34,42 +36,49 @@ public class SimulationInstanceImpl implements SimulationInstance {
 
   @Override
   public void run(int steps) {
+    // loop through the specified number of steps, or until there are no more instructions to execute
     for (int i = 0; i < steps && !remainingInstructions.isEmpty(); i++) {
+      // execute the next instruction in the queue
       executeNextInstruction();
     }
   }
 
   @Override
   public MemoryImpl getMemory() {
-    return memory;
+    return this.memory;
   }
 
   @Override
   public Queue<Instruction> getInstructions() {
-    return remainingInstructions;
+    return this.remainingInstructions;
   }
 
   @Override
   public StrategyType getStrategyType() {
-    return strategyType;
+    return this.strategyType;
   }
 
   @Override
   public List<InstructionException> getExceptions() {
-    return instructionExceptions;
+    return this.instructionExceptions;
   }
 
   private void executeNextInstruction() {
+    // get next instruction from the queue
     Instruction instruction = remainingInstructions.poll();
+
+    // If queue is empty, do nothing and return
     if (instruction == null)
       return;
 
     try {
+      // check the type of instrucction and execute the methods accordingly
       if (instruction instanceof AllocationInstruction) {
         allocateProcess((AllocationInstruction) instruction);
       } else if (instruction instanceof DeallocationInstruction) {
         deallocateProcess((DeallocationInstruction) instruction);
       } else if (instruction instanceof CompactInstruction) {
+        // compact the memory to remove any free slots
         compactMemory();
       }
     } catch (InstructionException e) {
@@ -85,8 +94,7 @@ public class SimulationInstanceImpl implements SimulationInstance {
     boolean success = memory.allocate(processId, size, strategyType);
 
     if (!success) {
-      // If allocation fails, throw an exception with the largest available free slot
-      // size
+      // If allocation fails, throw an exception with the largest available free slot size
       int largestSlotSize = memory.freeSlots().stream()
           .mapToInt(slot -> slot.getHighAddress() - slot.getLowAddress() + 1)
           .max()
