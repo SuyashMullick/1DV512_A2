@@ -1,11 +1,13 @@
 package se.lnu.os.ht24.a2.required;
 
 import se.lnu.os.ht24.a2.provided.data.ProcessInterval;
+import se.lnu.os.ht24.a2.provided.data.StrategyType;
 import se.lnu.os.ht24.a2.provided.interfaces.Memory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -148,6 +150,73 @@ public class MemoryImpl implements Memory {
 
         return freeSlots;
     }
+
+    
+    public boolean allocate(int processId, int size, StrategyType strategyType) {
+    if (containsProcess(processId) || size <= 0 || size > memory.length) {
+        return false; // Invalid request or process already exists.
+    }
+
+    // Find free slots
+    List<ProcessInterval> freeSlots = new ArrayList<>(freeSlots());
+    ProcessInterval selectedSlot = selectSlot(freeSlots, size, strategyType);
+
+    if (selectedSlot == null) {
+        return false; // No suitable slot found for allocation.
+    }
+
+    // Allocate memory
+    int start = selectedSlot.getLowAddress();
+    for (int i = start; i < start + size; i++) {
+        memory[i] = processId;
+    }
+
+    // Update process map
+    processMap.put(processId, new ProcessInterval(start, start + size - 1));
+    return true;
+}
+
+
+public boolean deallocate(int processId) {
+    if (!containsProcess(processId)) {
+        return false; // Process not found.
+    }
+
+    // Deallocate memory
+    ProcessInterval interval = processMap.get(processId);
+    for (int i = interval.getLowAddress(); i <= interval.getHighAddress(); i++) {
+        memory[i] = -1;
+    }
+
+    // Remove from process map
+    processMap.remove(processId);
+    return true;
+}
+
+// Helper method to select a slot based on strategy
+private ProcessInterval selectSlot(List<ProcessInterval> freeSlots, int size, StrategyType strategyType) {
+    switch (strategyType) {
+        case FIRST_FIT:
+            return freeSlots.stream()
+                    .filter(slot -> slot.getHighAddress() - slot.getLowAddress() + 1 >= size)
+                    .findFirst()
+                    .orElse(null);
+        case BEST_FIT:
+            return freeSlots.stream()
+                    .filter(slot -> slot.getHighAddress() - slot.getLowAddress() + 1 >= size)
+                    .min(Comparator.comparingInt(slot -> slot.getHighAddress() - slot.getLowAddress() + 1))
+                    .orElse(null);
+        case WORST_FIT:
+            return freeSlots.stream()
+                    .filter(slot -> slot.getHighAddress() - slot.getLowAddress() + 1 >= size)
+                    .max(Comparator.comparingInt(slot -> slot.getHighAddress() - slot.getLowAddress() + 1))
+                    .orElse(null);
+        default:
+            return null; // In case of an unsupported strategy type.
+    }
+}
+
+
 
     @Override
     public String toString() {
