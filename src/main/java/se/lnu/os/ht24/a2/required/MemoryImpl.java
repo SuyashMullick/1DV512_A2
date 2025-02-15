@@ -124,6 +124,9 @@ public class MemoryImpl implements Memory {
     // Initialize a set to store the free slots
     Set<ProcessInterval> freeSlots = new HashSet<>();
 
+    if (memory == null || memory.length == 0) {
+      return freeSlots;
+    }
     // free variable to keep track of the current free slot
     int start = -1;
 
@@ -169,12 +172,18 @@ public class MemoryImpl implements Memory {
 
     // Allocate memory
     int start = selectedSlot.getLowAddress();
+    int end = start + size - 1;
+
+    if (start < 0 || end >= memory.length) {
+      return false;             // handles out-of-bounds memory access.
+    }
+
     for (int i = start; i < start + size; i++) {
       memory[i] = processId;
     }
 
     // Update process map
-    processMap.put(processId, new ProcessInterval(start, start + size - 1));
+    processMap.put(processId, new ProcessInterval(start, end));
     return true;
   }
 
@@ -185,6 +194,9 @@ public class MemoryImpl implements Memory {
 
     // Deallocate memory
     ProcessInterval interval = processMap.get(processId);
+    if (interval == null) {
+      return false;             // safety check for null pointer exception.
+    }
     for (int i = interval.getLowAddress(); i <= interval.getHighAddress(); i++) {
       memory[i] = -1;
     }
@@ -200,6 +212,7 @@ public class MemoryImpl implements Memory {
       case FIRST_FIT:
         return freeSlots.stream()
             // Filter out slots that are smaller than the requested size
+            .sorted(Comparator.comparingInt(ProcessInterval::getLowAddress))
             .filter(slot -> slot.getHighAddress() - slot.getLowAddress() + 1 >= size)
             .findFirst() // Find the first free slot that meets the size requirement
             .orElse(null); // Return null if no suitable slot is found
